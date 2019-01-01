@@ -25,8 +25,8 @@ MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
 const char* ssid = "";
 const char* password = "";
 
-const char* host = "api.pro.coinbase.com";
-const char* fingerprint = "9C B0 72 05 A4 F9 D7 4E 5A A4 06 5E DD 1F 1C 27 5D C2 F1 48";
+const char* coinbaseHost = "api.pro.coinbase.com";
+const char* coinbaseFingerprint = "9C B0 72 05 A4 F9 D7 4E 5A A4 06 5E DD 1F 1C 27 5D C2 F1 48";
 
 const char* binanceHost = "api.binance.com";
 const char* binanceFingerprint = "41 82 D2 BA 64 E3 36 F1 3C 5E 49 05 2A A0 AA CB D0 F7 2B B7";
@@ -74,18 +74,21 @@ void connectToWIFI() {
     Serial.println(F("Server Started"));
 }
 
-JsonObject& getObject(String url) {
-    // Allocate JsonBuffer
-    const size_t capacity = JSON_OBJECT_SIZE(7) + 252;
+
+JsonObject& getJsonObject(String url, bool isCoinbaseCoin) {
+    const size_t capacity = (isCoinbaseCoin) ? JSON_OBJECT_SIZE(7) + 252 : JSON_OBJECT_SIZE(2) + 74;
     DynamicJsonBuffer jsonBuffer(capacity);
     
     // Use WiFiClientSecure class to create TLS connection
     WiFiClientSecure client;
     client.setTimeout(10000);
-    Serial.print("connecting to ");
+    
+    const char* host = (isCoinbaseCoin) ? coinbaseHost : binanceHost;
+    const char* fingerprint = (isCoinbaseCoin) ? coinbaseFingerprint : binanceFingerprint;
     Serial.println(host);
     Serial.printf("Using fingerprint '%s'\n", fingerprint);
     client.setFingerprint(fingerprint);
+    
     if (!client.connect(host, 443)) {
         Serial.println("connection failed");
         scrollText("Connection failed!");
@@ -95,7 +98,8 @@ JsonObject& getObject(String url) {
     Serial.println(F("Connected!"));
     
     // Send HTTP Request
-    client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+    String httpEnding = (isCoinbaseCoin) ? " HTTP/1.1\r\n" : " HTTP/1.0\r\n";
+    client.print(String("GET ") + url + httpEnding +
                  "Host: " + host + "\r\n" +
                  "User-Agent: BuildFailureDetectorESP8266\r\n" +
                  "Connection: close\r\n\r\n");
@@ -107,66 +111,6 @@ JsonObject& getObject(String url) {
     if (strcmp(status, "HTTP/1.1 200 OK") != 0) {
         Serial.print(F("Unexpected response: "));
         Serial.println(status);
-        //client.stop();
-        return jsonBuffer.parseObject(client);
-    }
-    
-    // Skip HTTP headers
-    char endOfHeaders[] = "\r\n\r\n";
-    if (!client.find(endOfHeaders)) {
-        Serial.println(F("Invalid response"));
-        //scrollText("Invalid Response");
-    }
-    
-    // Parse JSON object
-    JsonObject& root = jsonBuffer.parseObject(client);
-    if (!root.success()) {
-        Serial.println(F("Parsing failed!"));
-        //scrollText("JSON Parse Failed!");
-    }
-    
-    // Disconnect
-    client.stop();
-    jsonBuffer.clear();
-    return root;
-}
-
-JsonObject& getJsonObject(String url, bool isCoinbaseCoin) {
-    const size_t capacity = (isCoinbaseCoin) ? JSON_OBJECT_SIZE(7) + 252 : JSON_OBJECT_SIZE(2) + 74;
-    DynamicJsonBuffer jsonBuffer(capacity);
-    
-    // Use WiFiClientSecure class to create TLS connection
-    WiFiClientSecure client;
-    client.setTimeout(10000);
-    
-    const char* selectedHost = (isCoinbaseCoin) ? host : binanceHost;
-    const char* selectedFingerprint = (isCoinbaseCoin) ? fingerprint : binanceFingerprint;
-    Serial.println(selectedHost);
-    Serial.printf("Using fingerprint '%s'\n", selectedFingerprint);
-    client.setFingerprint(selectedFingerprint);
-    
-    if (!client.connect(selectedHost, 443)) {
-        Serial.println("connection failed");
-        scrollText("Connection failed!");
-        // No further work should be done if the connection failed
-        return jsonBuffer.parseObject(client);
-    }
-    Serial.println(F("Connected!"));
-    
-    // Send HTTP Request
-    String httpEnding = (isCoinbaseCoin) ? " HTTP/1.1\r\n" : " HTTP/1.0\r\n";
-    client.print(String("GET ") + url + httpEnding +
-                 "Host: " + selectedHost + "\r\n" +
-                 "User-Agent: BuildFailureDetectorESP8266\r\n" +
-                 "Connection: close\r\n\r\n");
-    Serial.println("request sent");
-    
-    // Check HTTP Status
-    char status[32] = {0};
-    client.readBytesUntil('\r', status, sizeof(status));
-    if (strcmp(status, "HTTP/1.1 200 OK") != 0) {
-        Serial.print(F("Unexpected response: "));
-        Serial.println(status);
         return jsonBuffer.parseObject(client);
     }
     
@@ -197,113 +141,6 @@ JsonObject& getJsonObject(String url, bool isCoinbaseCoin) {
     client.stop();
     jsonBuffer.clear();
     return root;
-}
-
-//////////////////////////////////////////
-JsonObject& getBinanceObject(String url) {
-    const size_t capacity = JSON_OBJECT_SIZE(2) + 74;
-    DynamicJsonBuffer jsonBuffer(capacity);
-    
-    // Use WiFiClientSecure class to create TLS connection
-    WiFiClientSecure client;
-    client.setTimeout(10000);
-    Serial.print("connecting to ");
-    Serial.println(binanceHost);
-    Serial.printf("Using fingerprint '%s'\n", binanceFingerprint);
-    client.setFingerprint(binanceFingerprint);
-    if (!client.connect(binanceHost, 443)) {
-        Serial.println("connection failed");
-        scrollText("Connection failed!");
-        // No further work should be done if the connection failed
-        return jsonBuffer.parseObject(client);
-    }
-    Serial.println(binanceHost+url);
-    Serial.println(F("Connected!"));
-    
-    // Send HTTP Request
-    client.print(String("GET ") + url + " HTTP/1.0\r\n" +
-                 "Host: " + binanceHost + "\r\n" +
-                 "User-Agent: BuildFailureDetectorESP8266\r\n" +
-                 "Connection: close\r\n\r\n");
-    Serial.println("request sent");
-    
-    // Check HTTP Status
-    char status[32] = {0};
-    client.readBytesUntil('\r', status, sizeof(status));
-    if (strcmp(status, "HTTP/1.1 200 OK") != 0) {
-        Serial.print(F("Unexpected response: "));
-        Serial.println(status);
-        return jsonBuffer.parseObject(client);
-    }
-    
-    // Skip HTTP headers
-    char endOfHeaders[] = "\r\n\r\n";
-    if (!client.find(endOfHeaders)) {
-        Serial.println(F("Invalid response"));
-        //scrollText("Invalid Response");
-    }
-    
-    // Read reply from server
-    //    Serial.println("[Response:]");
-    //    while (client.connected() || client.available()) {
-    //      if (client.available()) {
-    //        String line = client.readStringUntil('\n');
-    //        Serial.println(line);
-    //      }
-    //    }
-    
-    // Parse JSON object
-    JsonObject& root = jsonBuffer.parseObject(client);
-    if (!root.success()) {
-        Serial.println(F("Parsing failed!"));
-        //scrollText("JSON Parse Failed!");
-    }
-    
-    // Disconnect
-    client.stop();
-    jsonBuffer.clear();
-    return root;
-}
-
-
-void getCoinbasePrice(String url, String cryptoName) {
-    JsonObject& root = getObject(url);
-    Serial.println("==========");
-    Serial.println(F("Response:"));
-    Serial.print("Trade Id: ");
-    Serial.println(root["trade_id"].as<char*>());
-    Serial.print("Price: ");
-    Serial.println(root["price"].as<char*>());
-    float cryptoPrice = root["price"].as<float>();
-    Serial.println(cryptoPrice);
-    Serial.println("==========");
-    String output = cryptoName + " $" + String(cryptoPrice);
-    Serial.println(output);
-    
-    char *cstr = new char[output.length() + 1];
-    strcpy(cstr, output.c_str());
-    scrollText(cstr);
-    delete [] cstr;
-}
-
-void getBinancePrice(String url, String cryptoName) {
-    JsonObject& root = getBinanceObject(url);
-    Serial.println("==========");
-    Serial.println(F("Response:"));
-    Serial.print("Symbol: ");
-    Serial.println(root["symbol"].as<char*>());
-    Serial.print("Price: ");
-    Serial.println(root["price"].as<char*>());
-    String cryptoPrice = root["price"].as<String>();
-    Serial.println(cryptoPrice);
-    Serial.println("==========");
-    String output = cryptoName + " B" + cryptoPrice;
-    Serial.println(output);
-    
-    char *cstr = new char[output.length() + 1];
-    strcpy(cstr, output.c_str());
-    scrollText(cstr);
-    delete [] cstr;
 }
 
 void getCoinPrice(String url, String cryptoName, bool isCoinbaseCoin) {
@@ -368,14 +205,12 @@ void loop() {
         coinURL = req.substring(req.indexOf(' ') + 1, req.lastIndexOf('r') + 1);
         coinName = req.substring(14, req.indexOf('-'));
         Serial.println("Received coinbase Request! " + coinURL);
-        //getCoinbasePrice(coinURL, coinName);
     } else if (req.indexOf("/api/v1") != -1) {
         isCoinbaseCoin = false;
         // Example of req: GET /api/v1/ticker/price?symbol=XMRBTC HTTP/1.1
         coinURL = req.substring(req.indexOf(' ') + 1, req.lastIndexOf('C') + 1);
         coinName = req.substring(req.indexOf('=') + 1, req.lastIndexOf('B'));
         Serial.println("Received Binance Request! " + coinURL);
-        //getBinancePrice(coinURL, coinName);
     }
     else {
         Serial.println(F("Invalid Request"));
