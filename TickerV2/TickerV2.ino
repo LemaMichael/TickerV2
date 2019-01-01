@@ -5,6 +5,7 @@
 #include <SPI.h>
 #include <stdio.h>
 
+
 // Define the number of devices we have in the chain and the hardware interface
 // NOTE: These pin numbers will probably not work with your hardware and may
 // need to be adapted
@@ -34,25 +35,23 @@ const char* binanceFingerprint = "41 82 D2 BA 64 E3 36 F1 3C 5E 49 05 2A A0 AA C
 // specify the port to listen on as an argument
 WiFiServer server(80);
 
-
-void scrollText(char *p)
-{
-  uint8_t charWidth;
-  uint8_t cBuf[8];  // this should be ok for all built-in fonts
-  mx.clear();
-
-  while (*p != '\0')
-  {
-    charWidth = mx.getChar(*p++, sizeof(cBuf) / sizeof(cBuf[0]), cBuf);
-
-    for (uint8_t i=0; i<=charWidth; i++)  // allow space between characters
+void scrollText(char *p) {
+    uint8_t charWidth;
+    uint8_t cBuf[8];  // this should be ok for all built-in fonts
+    mx.clear();
+    
+    while (*p != '\0')
     {
-      mx.transform(MD_MAX72XX::TSL);
-      if (i < charWidth)
-        mx.setColumn(0, cBuf[i]);
-        delay(DELAYTIME);
+        charWidth = mx.getChar(*p++, sizeof(cBuf) / sizeof(cBuf[0]), cBuf);
+        
+        for (uint8_t i=0; i<=charWidth; i++)  // allow space between characters
+        {
+            mx.transform(MD_MAX72XX::TSL);
+            if (i < charWidth)
+                mx.setColumn(0, cBuf[i]);
+            delay(DELAYTIME);
+        }
     }
-  }
 }
 
 void connectToWIFI() {
@@ -68,18 +67,17 @@ void connectToWIFI() {
     Serial.println("");
     Serial.println("WiFi connected");
     Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());    
-
+    Serial.println(WiFi.localIP());
+    
     // Start the server
     server.begin();
     Serial.println(F("Server Started"));
-    
 }
 
 JsonObject& getObject(String url) {
     // Allocate JsonBuffer
     const size_t capacity = JSON_OBJECT_SIZE(7) + 252;
-    DynamicJsonBuffer jsonBuffer(capacity); 
+    DynamicJsonBuffer jsonBuffer(capacity);
     
     // Use WiFiClientSecure class to create TLS connection
     WiFiClientSecure client;
@@ -95,31 +93,31 @@ JsonObject& getObject(String url) {
         return jsonBuffer.parseObject(client);
     }
     Serial.println(F("Connected!"));
-
+    
     // Send HTTP Request
     client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: " + host + "\r\n" +
-               "User-Agent: BuildFailureDetectorESP8266\r\n" +
-               "Connection: close\r\n\r\n");
+                 "Host: " + host + "\r\n" +
+                 "User-Agent: BuildFailureDetectorESP8266\r\n" +
+                 "Connection: close\r\n\r\n");
     Serial.println("request sent");
     
     // Check HTTP Status
     char status[32] = {0};
     client.readBytesUntil('\r', status, sizeof(status));
     if (strcmp(status, "HTTP/1.1 200 OK") != 0) {
-      Serial.print(F("Unexpected response: "));
-      Serial.println(status);
-      //client.stop();
-      return jsonBuffer.parseObject(client);
+        Serial.print(F("Unexpected response: "));
+        Serial.println(status);
+        //client.stop();
+        return jsonBuffer.parseObject(client);
     }
-
+    
     // Skip HTTP headers
     char endOfHeaders[] = "\r\n\r\n";
     if (!client.find(endOfHeaders)) {
-      Serial.println(F("Invalid response"));
-      //scrollText("Invalid Response");
+        Serial.println(F("Invalid response"));
+        //scrollText("Invalid Response");
     }
-
+    
     // Parse JSON object
     JsonObject& root = jsonBuffer.parseObject(client);
     if (!root.success()) {
@@ -153,39 +151,39 @@ JsonObject& getBinanceObject(String url) {
     }
     Serial.println(binanceHost+url);
     Serial.println(F("Connected!"));
-
+    
     // Send HTTP Request
     client.print(String("GET ") + url + " HTTP/1.0\r\n" +
-               "Host: " + binanceHost + "\r\n" +
-               "User-Agent: BuildFailureDetectorESP8266\r\n" +
-               "Connection: close\r\n\r\n");
+                 "Host: " + binanceHost + "\r\n" +
+                 "User-Agent: BuildFailureDetectorESP8266\r\n" +
+                 "Connection: close\r\n\r\n");
     Serial.println("request sent");
     
     // Check HTTP Status
     char status[32] = {0};
     client.readBytesUntil('\r', status, sizeof(status));
     if (strcmp(status, "HTTP/1.1 200 OK") != 0) {
-      Serial.print(F("Unexpected response: "));
-      Serial.println(status);
-      return jsonBuffer.parseObject(client);
+        Serial.print(F("Unexpected response: "));
+        Serial.println(status);
+        return jsonBuffer.parseObject(client);
     }
-
+    
     // Skip HTTP headers
     char endOfHeaders[] = "\r\n\r\n";
     if (!client.find(endOfHeaders)) {
-      Serial.println(F("Invalid response"));
-      //scrollText("Invalid Response");
+        Serial.println(F("Invalid response"));
+        //scrollText("Invalid Response");
     }
-
+    
     // Read reply from server
-//    Serial.println("[Response:]");
-//    while (client.connected() || client.available()) {
-//      if (client.available()) {
-//        String line = client.readStringUntil('\n');
-//        Serial.println(line);
-//      }
-//    }
-
+    //    Serial.println("[Response:]");
+    //    while (client.connected() || client.available()) {
+    //      if (client.available()) {
+    //        String line = client.readStringUntil('\n');
+    //        Serial.println(line);
+    //      }
+    //    }
+    
     // Parse JSON object
     JsonObject& root = jsonBuffer.parseObject(client);
     if (!root.success()) {
@@ -200,105 +198,103 @@ JsonObject& getBinanceObject(String url) {
 }
 
 void getCoinbasePrice(String url, String cryptoName) {
-  JsonObject& root = getObject(url);
-  Serial.println("==========");
-  Serial.println(F("Response:"));
-  Serial.print("Trade Id: ");
-  Serial.println(root["trade_id"].as<char*>());
-  Serial.print("Price: ");
-  Serial.println(root["price"].as<char*>());
-  float cryptoPrice = root["price"].as<float>();
-  Serial.println(cryptoPrice);
-  Serial.println("==========");
-  String output = cryptoName + " $" + String(cryptoPrice);
-  Serial.println(output);
-
-  char *cstr = new char[output.length() + 1];
-  strcpy(cstr, output.c_str());
-  scrollText(cstr);
-  delete [] cstr;
+    JsonObject& root = getObject(url);
+    Serial.println("==========");
+    Serial.println(F("Response:"));
+    Serial.print("Trade Id: ");
+    Serial.println(root["trade_id"].as<char*>());
+    Serial.print("Price: ");
+    Serial.println(root["price"].as<char*>());
+    float cryptoPrice = root["price"].as<float>();
+    Serial.println(cryptoPrice);
+    Serial.println("==========");
+    String output = cryptoName + " $" + String(cryptoPrice);
+    Serial.println(output);
+    
+    char *cstr = new char[output.length() + 1];
+    strcpy(cstr, output.c_str());
+    scrollText(cstr);
+    delete [] cstr;
 }
 
 void getBinancePrice(String url, String cryptoName) {
-  JsonObject& root = getBinanceObject(url);
-  Serial.println("==========");
-  Serial.println(F("Response:"));
-  Serial.print("Symbol: ");
-  Serial.println(root["symbol"].as<char*>());
-  Serial.print("Price: ");
-  Serial.println(root["price"].as<char*>());
-  String cryptoPrice = root["price"].as<String>();
-  Serial.println(cryptoPrice);
-  Serial.println("==========");
-  String output = cryptoName + " B" + cryptoPrice;
-  Serial.println(output);
-
-  char *cstr = new char[output.length() + 1];
-  strcpy(cstr, output.c_str());
-  scrollText(cstr);
-  delete [] cstr;
+    JsonObject& root = getBinanceObject(url);
+    Serial.println("==========");
+    Serial.println(F("Response:"));
+    Serial.print("Symbol: ");
+    Serial.println(root["symbol"].as<char*>());
+    Serial.print("Price: ");
+    Serial.println(root["price"].as<char*>());
+    String cryptoPrice = root["price"].as<String>();
+    Serial.println(cryptoPrice);
+    Serial.println("==========");
+    String output = cryptoName + " B" + cryptoPrice;
+    Serial.println(output);
+    
+    char *cstr = new char[output.length() + 1];
+    strcpy(cstr, output.c_str());
+    scrollText(cstr);
+    delete [] cstr;
 }
 
 void setup() {
-  // put your setup code here, to run once:
-  mx.begin();
-  Serial.begin(115200);
-  connectToWIFI();
-
+    // put your setup code here, to run once:
+    mx.begin();
+    Serial.begin(115200);
+    connectToWIFI();
 }
 
 void loop() {
-  // Check if a client has connected
-  WiFiClient client = server.available();
+    // Check if a client has connected
+    WiFiClient client = server.available();
     if(!client) {
         return;
-  }
-  Serial.println(F("new client"));
-  client.setTimeout(5000); // Default is 1000
-  
-  
-  // Read the first line of the request
-  String req = client.readStringUntil('\r');
-  Serial.println(F("Request: "));
-  Serial.println(req);
-
-  // Match the request
-  if (req.indexOf("/products") != -1) {
-    // Example of req: GET /products/BTC-USD/ticker HTTP/1.1
-    String coinURL = req.substring(4,28);
-    String coinName = req.substring(14,17);
-    Serial.println("Received coinbase Request! " + coinURL);
-    getCoinbasePrice(coinURL, coinName);
-  } else if (req.indexOf("/api/v1") != -1) {
-    // Example of req: GET /api/v1/ticker/price?symbol=XMRBTC HTTP/1.1
-    String coinURL = req.substring(4,38);
-    String coinName = req.substring(32,35);
-    Serial.println("Received Binance Request! " + coinURL);
-    getBinancePrice(coinURL, coinName);
-  }
-  else {
-    Serial.println(F("Invalid Request"));
-  }
-  
-  while (client.available()) {
-    // byte by byte is not very efficient
-    client.read();
-  }
-
-  // Send the response to the client
-  // it is OK for multiple small client.print/write,
-  // because nagle algorithm will group them into one single packet
-  client.print(F("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\nGPIO is now "));
-  client.print(F("<br><br>Click <a href='http://"));
-  client.print(WiFi.localIP());
-  client.print(F("/gpio/1'>here</a> to switch LED GPIO on, or <a href='http://"));
-  client.print(WiFi.localIP());
-  client.print(F("/gpio/0'>here</a> to switch LED GPIO off.</html>"));
-
-  // The client will actually be *flushed* then disconnected
-  // when the function returns and 'client' object is destroyed (out-of-scope)
-  // flush = ensure written data are received by the other side
-  Serial.println(F("Disconnecting from client"));
-  
-
+    }
+    Serial.println(F("new client"));
+    client.setTimeout(5000); // Default is 1000
+    
+    // Read the first line of the request
+    String req = client.readStringUntil('\r');
+    Serial.println(F("Request: "));
+    Serial.println(req);
+    
+    String coinURL;
+    String coinName;
+    // Match the request
+    if (req.indexOf("/products") != -1) {
+        // Example of req: GET /products/BTC-USD/ticker HTTP/1.1
+        coinURL = req.substring(req.indexOf(' ') + 1, req.lastIndexOf('r') + 1);
+        coinName = req.substring(14, req.indexOf('-'));
+        Serial.println("Received coinbase Request! " + coinURL);
+        getCoinbasePrice(coinURL, coinName);
+    } else if (req.indexOf("/api/v1") != -1) {
+        // Example of req: GET /api/v1/ticker/price?symbol=XMRBTC HTTP/1.1
+        coinURL = req.substring(req.indexOf(' ') + 1, req.lastIndexOf('C') + 1);
+        coinName = req.substring(req.indexOf('=') + 1, req.lastIndexOf('B'));
+        Serial.println("Received Binance Request! " + coinURL);
+        getBinancePrice(coinURL, coinName);
+    }
+    else {
+        Serial.println(F("Invalid Request"));
+    }
+    
+    while (client.available()) {
+        // byte by byte is not very efficient
+        client.read();
+    }
+    
+    // Send the response to the client
+    // it is OK for multiple small client.print/write,
+    // because nagle algorithm will group them into one single packet
+    client.print(F("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\nGPIO is now "));
+    client.print(F("<br><br>Click <a href='http://"));
+    client.print(WiFi.localIP());
+    client.print(F("/gpio/1'>here</a> to switch LED GPIO on, or <a href='http://"));
+    client.print(WiFi.localIP());
+    client.print(F("/gpio/0'>here</a> to switch LED GPIO off.</html>"));
+    
+    // The client will actually be *flushed* then disconnected
+    // when the function returns and 'client' object is destroyed (out-of-scope)
+    // flush = ensure written data are received by the other side
+    Serial.println(F("Disconnecting from client"));
 }
