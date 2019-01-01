@@ -121,13 +121,13 @@ JsonObject& getJsonObject(String url, bool isCoinbaseCoin) {
         //scrollText("Invalid Response");
     }
     
-    // Read reply from server
+    //Read reply from server
     //    Serial.println("[Response:]");
     //    while (client.connected() || client.available()) {
-    //      if (client.available()) {
-    //        String line = client.readStringUntil('\n');
-    //        Serial.println(line);
-    //      }
+    //        if (client.available()) {
+    //            String line = client.readStringUntil('\n');
+    //            Serial.println(line);
+    //        }
     //    }
     
     // Parse JSON object
@@ -143,6 +143,20 @@ JsonObject& getJsonObject(String url, bool isCoinbaseCoin) {
     return root;
 }
 
+float bitcoinPrice = 0.0;
+
+float convertToUSD(float cryptoPrice) {
+    if (bitcoinPrice == 0.0) { getBitcoinPrice(); }
+    return bitcoinPrice * cryptoPrice;
+}
+
+void getBitcoinPrice() {
+    JsonObject& root = getJsonObject("/api/v1/ticker/price?symbol=BTCUSDC", false);
+    Serial.print("The Bitcoin price is:");
+    Serial.println(root["price"].as<float>());
+    bitcoinPrice = root["price"].as<float>();
+}
+
 void getCoinPrice(String url, String cryptoName, bool isCoinbaseCoin) {
     JsonObject& root = getJsonObject(url, isCoinbaseCoin);
     Serial.println("==========");
@@ -151,21 +165,16 @@ void getCoinPrice(String url, String cryptoName, bool isCoinbaseCoin) {
     Serial.println(root["symbol"].as<char*>());
     Serial.print("Price: ");
     Serial.println(root["price"].as<char*>());
-
-    String output;
-    if (!isCoinbaseCoin) {
-        String cryptoPrice = root["price"].as<String>();
-        Serial.println(cryptoPrice);
-        Serial.println("==========");
-        output = cryptoName + " B" + cryptoPrice;
-        Serial.println(output);
-    } else {
-        float cryptoPrice = root["price"].as<float>();
-        Serial.println(cryptoPrice);
-        Serial.println("==========");
-        output = cryptoName + " $" + String(cryptoPrice);
-        Serial.println(output);
-    }
+    
+    float cryptoPrice = root["price"].as<float>();
+    cryptoPrice = (isCoinbaseCoin) ? cryptoPrice : convertToUSD(cryptoPrice);
+    Serial.println(cryptoPrice);
+    Serial.println("==========");
+    String output = cryptoName + " $" + String(cryptoPrice);
+    Serial.println(output);
+    
+    // Update the bitcoinPrice if the User requests the Bitcoin Price
+    bitcoinPrice = (cryptoName == "BTC") ? cryptoPrice : bitcoinPrice;
     
     char *cstr = new char[output.length() + 1];
     strcpy(cstr, output.c_str());
@@ -216,7 +225,6 @@ void loop() {
         Serial.println(F("Invalid Request"));
         return;
     }
-    
     getCoinPrice(coinURL, coinName, isCoinbaseCoin);
     
     while (client.available()) {
