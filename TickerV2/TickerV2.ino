@@ -10,7 +10,7 @@
 // NOTE: These pin numbers will probably not work with your hardware and may
 // need to be adapted
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
-#define MAX_DEVICES 4
+#define MAX_DEVICES 8
 
 #define CLK_PIN   D5 // or SCK
 #define DATA_PIN  D7 // or MOSI
