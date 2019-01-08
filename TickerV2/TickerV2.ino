@@ -35,6 +35,12 @@ const char* binanceFingerprint = "41 82 D2 BA 64 E3 36 F1 3C 5E 49 05 2A A0 AA C
 // specify the port to listen on as an argument
 WiFiServer server(80);
 
+struct Coin {
+  String url;
+  String ticker; 
+  bool isCoinbaseCoin;
+};
+
 void scrollText(char *p) {
     uint8_t charWidth;
     uint8_t cBuf[8];  // this should be ok for all built-in fonts
@@ -207,30 +213,28 @@ void loop() {
     String req = client.readStringUntil('\r');
     Serial.println(F("Request: "));
     Serial.println(req);
-    
-    String coinURL;
-    String coinName;
-    bool isCoinbaseCoin;
+
+    struct Coin currentCoin; 
     
     // Match the request
     if (req.indexOf("/products") != -1) {
         // Example of req: GET /products/BTC-USD/ticker HTTP/1.1
-        isCoinbaseCoin = true;
-        coinURL = req.substring(req.indexOf(' ') + 1, req.lastIndexOf('r') + 1);
-        coinName = req.substring(14, req.indexOf('-'));
-        Serial.println("Received coinbase Request! " + coinURL);
+        currentCoin.isCoinbaseCoin = true;
+        currentCoin.url = req.substring(req.indexOf(' ') + 1, req.lastIndexOf('r') + 1);
+        currentCoin.ticker = req.substring(14, req.indexOf('-'));
+        Serial.println("Received coinbase Request! " + currentCoin.url);
     } else if (req.indexOf("/api/v1") != -1) {
-        isCoinbaseCoin = false;
+        currentCoin.isCoinbaseCoin = false;
         // Example of req: GET /api/v1/ticker/price?symbol=XMRBTC HTTP/1.1
-        coinURL = req.substring(req.indexOf(' ') + 1, req.lastIndexOf('C') + 1);
-        coinName = req.substring(req.indexOf('=') + 1, req.lastIndexOf('B'));
-        Serial.println("Received Binance Request! " + coinURL);
+        currentCoin.url = req.substring(req.indexOf(' ') + 1, req.lastIndexOf('C') + 1);
+        currentCoin.ticker = req.substring(req.indexOf('=') + 1, req.lastIndexOf('B'));
+        Serial.println("Received Binance Request! " + currentCoin.url);
     }
     else {
         Serial.println(F("Invalid Request"));
         return;
     }
-    getCoinPrice(coinURL, coinName, isCoinbaseCoin);
+    getCoinPrice(currentCoin.url, currentCoin.ticker, currentCoin.isCoinbaseCoin);
     
     while (client.available()) {
         // byte by byte is not very efficient
