@@ -72,6 +72,11 @@ void connectToWIFI() {
     // Start the server
     server.begin();
     Serial.println(F("Server Started"));
+
+     // Set up first message as the IP address
+    char firstMessage[255];
+    sprintf(firstMessage, "%03d.%03d.%03d.%03d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
+    scrollText(firstMessage);
 }
 
 
